@@ -2,6 +2,8 @@
 
 var gulp = require('gulp'),
     plugins = require('gulp-load-plugins')(),
+    browserSync = require('browser-sync'),
+    reload = browserSync.reload,
     pkg = require('./package'),
     scripts = {
         all: [
@@ -96,6 +98,19 @@ gulp.task('release', ['js', 'docs'], function () {
 
 gulp.task('watch', function () {
     gulp.watch(scripts.src, ['jscopy']);
+    gulp.watch(styles.src, ['csscopy']);
+});
+
+gulp.task('serve', function () {
+    browserSync({
+        // notify: false,
+        port: 9000,
+        server: {
+            baseDir: ['docs']
+        }
+    });
+
+    gulp.watch(scripts.src, ['jscopy']).on('change', reload);
     gulp.watch(styles.src, ['csscopy']);
 });
 

@@ -2,10 +2,10 @@
  * CityPicker v1.1.0
  * https://github.com/tshi0912/citypicker
  *
- * Copyright (c) 2015-2016 Tao Shi
+ * Copyright (c) 2015-2017 Tao Shi
  * Released under the MIT license
  *
- * Date: 2016-09-09T12:11:57.119Z
+ * Date: 2017-02-13T03:04:40.802Z
  */
 
 (function (factory) {
@@ -190,7 +190,8 @@
         },
 
         bind: function () {
-            var $this = this;
+            var $this = this,
+                options = this.options;
 
             $(document).on('click', (this._mouteclick = function (e) {
                 var $target = $(e.target);
@@ -254,9 +255,10 @@
                 $active.removeClass('active');
                 $(this).addClass('active');
                 if ($active.data('code') !== $(this).data('code')) {
-                    $select.data('item', {
-                        address: $(this).attr('title'), code: $(this).data('code')
-                    });
+                    var item = {};
+                    item[options.textField] = $(this).attr('title');
+                    item[options.valueField] = $(this).data('code');
+                    $select.data('item', item);
                     $(this).trigger(EVENT_CHANGE);
                     $this.feedText();
                     $this.feedVal(true);
@@ -328,14 +330,17 @@
         },
 
         getText: function () {
-            var text = '';
+            var text = '',
+                options = this.options;
             this.$dropdown.find('.city-select')
                 .each(function () {
                     var item = $(this).data('item'),
                         type = $(this).data('count');
                     if (item) {
-                        text += ($(this).hasClass('province') ? '' : '/') + '<span class="select-item" data-count="' +
-                            type + '" data-code="' + item.code + '">' + item.address + '</span>';
+                        text += ($(this).hasClass('province') ? '' : '/') +
+                        '<span class="select-item" data-count="' + type + 
+                        '" data-code="' + item[options.valueField] + '">' + 
+                        item[options.textField] + '</span>';
                     }
                 });
             return text;
@@ -369,12 +374,13 @@
         },
 
         getVal: function () {
-            var text = '';
+            var text = '',
+                options = this.options;
             this.$dropdown.find('.city-select')
                 .each(function () {
                     var item = $(this).data('item');
                     if (item) {
-                        text += ($(this).hasClass('province') ? '' : '/') + item.address;
+                        text += ($(this).hasClass('province') ? '' : '/') + item[options.textField];
                     }
                 });
             return text;
@@ -391,11 +397,12 @@
             var options = this.options;
             //var placeholders = this.placeholders;
             var $select = this['$' + type];
-            var data = type === PROVINCE ? {} : [];
+            // var data = type === PROVINCE ? {} : [];
+            var data;
             var item;
             var districts;
             var code;
-            var matched = null;
+            var matched = {};
             var value;
 
             if (!$select || !$select.length) {
@@ -404,7 +411,7 @@
 
             item = $select.data('item');
 
-            value = (item ? item.address : null) || options[type];
+            value = (item ? item[options.textField] : null) || options[type];
 
             code = (
                 type === PROVINCE ? 86 :
@@ -416,87 +423,84 @@
 
             if ($.isPlainObject(districts)) {
                 $.each(districts, function (code, address) {
-                    var provs;
-                    if (type === PROVINCE) {
-                        provs = [];
+                    //var provs;
+                    var tmp = {};
+                    if ($.isArray(address)) {
+                        var provs = [];
                         for (var i = 0; i < address.length; i++) {
-                            if (address[i].address === value) {
-                                matched = {
-                                    code: address[i].code,
-                                    address: address[i].address
-                                };
+                            if (address[i][options.textField] === value) {
+                                matched[options.textField] = address[i][options.textField];
+                                matched[options.valueField] = address[i][options.valueField];
                             }
-                            provs.push({
-                                code: address[i].code,
-                                address: address[i].address,
-                                selected: address[i].address === value
-                            });
+                            tmp[options.textField] = address[i][options.textField];
+                            tmp[options.valueField] = address[i][options.valueField];
+                            provs.push($.extend(tmp, {
+                                selected: address[i][options.textField] === value
+                            }));
                         }
+                        data = data || {};
                         data[code] = provs;
                     } else {
                         if (address === value) {
-                            matched = {
-                                code: code,
-                                address: address
-                            };
+                            matched[options.textField] = address;
+                            matched[options.valueField] = code;
                         }
-                        data.push({
-                            code: code,
-                            address: address,
+                        tmp[options.textField] = address;
+                        tmp[options.valueField] = code;
+                        data = data || [];
+                        data.push($.extend(tmp, {
                             selected: address === value
-                        });
+                        }));
                     }
                 });
             }
 
-            $select.html(type === PROVINCE ? this.getProvinceList(data) :
-                this.getList(data, type));
-            $select.data('item', matched);
-        },
-
-        getProvinceList: function (data) {
-            var list = [],
-                $this = this,
-                simple = this.options.simple;
-
-            $.each(data, function (i, n) {
-                list.push('<dl class="clearfix">');
-                list.push('<dt>' + i + '</dt><dd>');
-                $.each(n, function (j, m) {
-                    list.push(
-                        '<a' +
-                        ' title="' + (m.address || '') + '"' +
-                        ' data-code="' + (m.code || '') + '"' +
-                        ' class="' +
-                        (m.selected ? ' active' : '') +
-                        '">' +
-                        ( simple ? $this.simplize(m.address, PROVINCE) : m.address) +
-                        '</a>');
-                });
-                list.push('</dd></dl>');
-            });
-
-            return list.join('');
+            $select.html(this.getList(data, type));
+            $select.data('item', $.isEmptyObject(matched) ? null : matched);
         },
 
         getList: function (data, type) {
             var list = [],
+                $this = this;
+
+            if (data) {
+                list.push('<dl class="clearfix">');
+
+                if ($.isArray(data)) {
+                    list.push('<dd>');
+                    list.push(this.getSubList(data, type));
+                    list.push('</dd>');
+                } else {
+                    $.each(data, function (key, val) {
+                        list.push('<dt>' + key + '</dt><dd>');
+                        list.push($this.getSubList(val, type));
+                        list.push('</dd>');
+                    });
+                }
+
+                list.push('</dl>');
+            }
+
+            return list.join('');
+        },
+
+        getSubList: function (data, type) {
+            var list = [],
                 $this = this,
+                options = this.options,
                 simple = this.options.simple;
-            list.push('<dl class="clearfix"><dd>');
 
             $.each(data, function (i, n) {
                 list.push(
                     '<a' +
-                    ' title="' + (n.address || '') + '"' +
-                    ' data-code="' + (n.code || '') + '"' +
+                    ' title="' + (n[options.textField] || '') + '"' +
+                    ' data-code="' + (n[options.valueField] || '') + '"' +
                     ' class="' +
                     (n.selected ? ' active' : '') +
                     '">' +
-                    ( simple ? $this.simplize(n.address, type) : n.address) +
+                    ( simple ? $this.simplize(n[options.textField], type) : n[options.textField]) +
                     '</a>');
             });
-            list.push('</dd></dl>');
 
             return list.join('');
         },
@@ -545,7 +549,9 @@
         level: 'district',
         province: '',
         city: '',
-        district: ''
+        district: '',
+        textField: 'address',
+        valueField: 'code'
     };
 
     CityPicker.setDefaults = function (options) {

@@ -132,7 +132,7 @@
     line-height: 2;
 }
 
-.city-select.province dd {
+.city-select dt + dd {
     margin-left: 3em;
 }
 
